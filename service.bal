@@ -5,6 +5,11 @@ import ballerina/lang.value;
 final mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
 
 # A service representing a network-accessible API bound to port `9090`.
+@http:ServiceConfig {
+    // The interceptor pipeline. The base path of the interceptor services is the same as
+    // the target service. Hence, they will be executed only for this particular service.
+    interceptors: [new RequestInterceptor()]
+}
 service /admin on new http:Listener(9090) {
 
     # A resource for reading all medical needs
@@ -122,7 +127,7 @@ service /admin on new http:Listener(9090) {
         if (check checkPeriodNeedandQuotation(aidPackageItem.needID, aidPackageItem.quotationID)) {
             aidPackageItem.packageID = packageID;
             if (check checkMedicalNeedQuantityAvailable(aidPackageItem)) {
-                if (check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem,false)) {
+                if (check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem, false)) {
                     check insertOrUpdateAidPackageItem(aidPackageItem);
                     check updateMedicalNeedQuantity(aidPackageItem.needID);
                     aidPackageItem.quotation = check getQuotation(aidPackageItem.quotationID);
@@ -145,7 +150,7 @@ service /admin on new http:Listener(9090) {
         AidPackageItem[] aidPackageItems = check getAidPackageItems(packageID);
         foreach AidPackageItem aidPackageItem in aidPackageItems {
             aidPackageItem.packageID = packageID;
-            check deleteAidPackageItem(packageID, <int> aidPackageItem.packageItemID);
+            check deleteAidPackageItem(packageID, <int>aidPackageItem.packageItemID);
             check updateMedicalNeedQuantity(aidPackageItem.needID);
             check updateQuotationRemainingQuantity(aidPackageItem);
         }
@@ -198,7 +203,7 @@ service /admin on new http:Listener(9090) {
     }
 
     # A resource for fetching all donors who have pledged for an Aid-Package.
-    # 
+    #
     # + return - List of donors
     resource function get aidpackages/[int packageId]/donors() returns Donor[]|error {
         Pledge[] availablePledges = check getPledges(packageId);
