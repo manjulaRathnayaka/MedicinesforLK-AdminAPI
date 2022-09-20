@@ -2,11 +2,15 @@ import ballerina/io;
 import ballerina/jwt;
 import ballerina/http;
 
-// Header names to be set to the request in the request interceptor.
-final string interceptor_header = "requestHeader";
+// End user group to grant access to the service invocation.
+configurable string AUTHORIZED_USER_GROUP = "Admin";
 
-// Header values to be set to the request in the request interceptor.
-final string interceptor_header_value = "RequestInterceptor";
+type IDPClaims record {
+    // string aut;
+    string|string[] groups;
+    // string email;
+    //string username;
+};
 
 // A `Requestinterceptorservice` class implementation. It intercepts the request
 // and adds a header before it is dispatched to the target service. A `RequestInterceptorService`
@@ -20,29 +24,48 @@ service class RequestInterceptor {
     // executed only for the requests, which match the accessor and path.
     resource function 'default [string... path](http:RequestContext ctx,
                         http:Request req) returns http:NextService|error? {
-        // Sets a header to the request inside the interceptor service.
-        io:println("in the interceptor");
-        req.setHeader(interceptor_header, interceptor_header_value);
+        boolean isAuthorized = false;
+        string|http:HeaderNotFoundError jwtAssertion = req.getHeader("x-jwt-assertion");
+        if jwtAssertion is string {
+            // io:println(jwtAssertion);
+            [jwt:Header, jwt:Payload]|jwt:Error decodedJWTAssertion = jwt:decode(jwtAssertion);
+            if decodedJWTAssertion is [jwt:Header, jwt:Payload] {
+                jwt:Payload payload = decodedJWTAssertion[1];
 
-        string|http:HeaderNotFoundError header = req.getHeader("x-jwt-assertion");
-        if header is string {
-            io:println(header);
-            [jwt:Header, jwt:Payload]|jwt:Error decode = jwt:decode(header);
-            if decode is [jwt:Header, jwt:Payload] {
-                jwt:Payload payload = decode[1];
-
-                io:println(payload);
+                do {
+                    IDPClaims idpClaims = check payload.get("idp_claims").cloneWithType(IDPClaims);
+                    string|string[] groups = idpClaims.groups;
+                    if groups is string {
+                        if groups == AUTHORIZED_USER_GROUP {
+                            isAuthorized = true;
+                            // io:println("Access is valid");
+                        }
+                    } else {
+                        int? indexOf = groups.indexOf(AUTHORIZED_USER_GROUP, 0);
+                        if indexOf is int {
+                            isAuthorized = true;
+                            // io:println("Access is valid");
+                        }
+                    }
+                } on fail var e {
+                    io:print(e);
+                }
             }
-            if decode is jwt:Error {
-                io:println(decode);
+            if decodedJWTAssertion is jwt:Error {
+                io:println(decodedJWTAssertion);
             }
         }
-        if header is http:HeaderNotFoundError {
+        if jwtAssertion is http:HeaderNotFoundError {
             io:println("jwt header not found...");
         }
         // Returns the next interceptor or the target service in the pipeline. 
         // An error is returned when the call fails.
-        return ctx.next();
+        if isAuthorized {
+            return ctx.next();
+        } else {
+            return error("Access Denied.");
+        }
+
     }
 }
 
