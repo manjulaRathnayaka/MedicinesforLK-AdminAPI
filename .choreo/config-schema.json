@@ -8,6 +8,10 @@
         "admin_api": {
           "type": "object",
           "properties": {
+            "AUTHORIZED_USER_GROUP": {
+              "type": "string",
+              "description": ""
+            },
             "dbHost": {
               "type": "string",
               "description": ""
