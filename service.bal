@@ -6,9 +6,7 @@ final mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
 
 # A service representing a network-accessible API bound to port `9090`.
 @http:ServiceConfig {
-    // The interceptor pipeline. The base path of the interceptor services is the same as
-    // the target service. Hence, they will be executed only for this particular service.
-    interceptors: [new RequestInterceptor()]
+    interceptors: [new JWTValidationRequestInterceptor()]
 }
 service /admin on new http:Listener(9090) {
 
