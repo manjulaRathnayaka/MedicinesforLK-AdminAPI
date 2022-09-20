@@ -4,69 +4,50 @@ import ballerina/http;
 
 // End user group to grant access to the service invocation.
 configurable string AUTHORIZED_USER_GROUP = "Admin";
+final string JWT_ASSERTION_HEADER_NAME = "x-jwt-assertion";
 
 type IDPClaims record {
-    // string aut;
     string|string[] groups;
-    // string email;
-    //string username;
 };
 
-// A `Requestinterceptorservice` class implementation. It intercepts the request
-// and adds a header before it is dispatched to the target service. A `RequestInterceptorService`
-// class can have only one resource function. 
-service class RequestInterceptor {
+// This request interceptor validates the JWT token received from the API gateway to make sure the end user accessing the API belongs to the AUTHORIZED_USER_GROUP.
+service class JWTValidationRequestInterceptor {
     *http:RequestInterceptor;
 
-    // A default resource function, which will be executed for all the requests. 
-    // A `RequestContext` is used to share data between the interceptors.
-    // An accessor and a path can also be specified. In that case, the interceptor will be
-    // executed only for the requests, which match the accessor and path.
     resource function 'default [string... path](http:RequestContext ctx,
                         http:Request req) returns http:NextService|error? {
         boolean isAuthorized = false;
-        string|http:HeaderNotFoundError jwtAssertion = req.getHeader("x-jwt-assertion");
+        string|http:HeaderNotFoundError jwtAssertion = req.getHeader(JWT_ASSERTION_HEADER_NAME);
         if jwtAssertion is string {
-            // io:println(jwtAssertion);
             [jwt:Header, jwt:Payload]|jwt:Error decodedJWTAssertion = jwt:decode(jwtAssertion);
             if decodedJWTAssertion is [jwt:Header, jwt:Payload] {
                 jwt:Payload payload = decodedJWTAssertion[1];
-
                 do {
                     IDPClaims idpClaims = check payload.get("idp_claims").cloneWithType(IDPClaims);
                     string|string[] groups = idpClaims.groups;
                     if groups is string {
-                        if groups == AUTHORIZED_USER_GROUP {
-                            isAuthorized = true;
-                            // io:println("Access is valid");
-                        }
+                        isAuthorized = groups == AUTHORIZED_USER_GROUP;
                     } else {
-                        int? indexOf = groups.indexOf(AUTHORIZED_USER_GROUP, 0);
-                        if indexOf is int {
-                            isAuthorized = true;
-                            // io:println("Access is valid");
-                        }
+                        isAuthorized = groups.indexOf(AUTHORIZED_USER_GROUP, 0) is int;
                     }
                 } on fail var e {
-                    io:print(e);
+                    io:println("Failed to get IDP Claims(idp_claims) from the decoded JWT Asserion.", e);
                 }
             }
             if decodedJWTAssertion is jwt:Error {
-                io:println(decodedJWTAssertion);
+                io:println("JWT Assertion decode operation failed.", decodedJWTAssertion);
             }
         }
         if jwtAssertion is http:HeaderNotFoundError {
-            io:println("jwt header not found...");
+            io:println("JWT Assertion is not found with the header name: " + JWT_ASSERTION_HEADER_NAME);
         }
-        // Returns the next interceptor or the target service in the pipeline. 
-        // An error is returned when the call fails.
+
         if isAuthorized {
             return ctx.next();
         } else {
             io:println("Unauthorized access attemp identified.");
             return error("Unauthorized Access", message = "Unauthorized Access", code = 401);
         }
-
     }
 }
 
