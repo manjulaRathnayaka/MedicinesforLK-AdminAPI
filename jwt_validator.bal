@@ -63,6 +63,7 @@ service class RequestInterceptor {
         if isAuthorized {
             return ctx.next();
         } else {
+            io:println("Unauthorized access attemp identified.");
             return error("Unauthorized Access", message = "Unauthorized Access", code = 401);
         }
 
