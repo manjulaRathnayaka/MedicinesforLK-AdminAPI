@@ -63,7 +63,7 @@ service class RequestInterceptor {
         if isAuthorized {
             return ctx.next();
         } else {
-            return error("Access Denied.");
+            return error("Unauthorized Access", message = "Unauthorized Access", code = 401);
         }
 
     }
