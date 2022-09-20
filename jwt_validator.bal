@@ -2,7 +2,6 @@ import ballerina/io;
 import ballerina/jwt;
 import ballerina/http;
 
-
 // Header names to be set to the request in the request interceptor.
 final string interceptor_header = "requestHeader";
 
@@ -19,7 +18,7 @@ service class RequestInterceptor {
     // A `RequestContext` is used to share data between the interceptors.
     // An accessor and a path can also be specified. In that case, the interceptor will be
     // executed only for the requests, which match the accessor and path.
-    resource function 'default [string... path](http:RequestContext ctx, 
+    resource function 'default [string... path](http:RequestContext ctx,
                         http:Request req) returns http:NextService|error? {
         // Sets a header to the request inside the interceptor service.
         io:println("in the interceptor");
@@ -27,10 +26,11 @@ service class RequestInterceptor {
 
         string|http:HeaderNotFoundError header = req.getHeader("x-jwt-assertion");
         if header is string {
+            io:println(header);
             [jwt:Header, jwt:Payload]|jwt:Error decode = jwt:decode(header);
             if decode is [jwt:Header, jwt:Payload] {
                 jwt:Payload payload = decode[1];
-            
+
                 io:println(payload);
             }
             if decode is jwt:Error {
@@ -45,5 +45,4 @@ service class RequestInterceptor {
         return ctx.next();
     }
 }
-
 
